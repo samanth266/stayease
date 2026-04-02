@@ -45,7 +45,10 @@ def _load_from_env() -> Settings:
                 f"[StayEase] Environment variable '{env_var}' is not set or empty.",
                 stacklevel=2,
             )
-            value = ""
+            raise ValueError(
+                f"Missing required environment variable: {env_var}. "
+                "Create a .env file in the backend folder."
+            )
         values[attr] = value
     return Settings(**values)
 
