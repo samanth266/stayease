@@ -7,18 +7,58 @@ from sqlalchemy.orm import Session
 
 from auth import require_guest
 from database import get_db
-from models import Booking, User
+from models import Booking, Property, User
 from schemas import BookingCreate, BookingResponse
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
-def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Booking creation is not implemented yet.",
+def create_booking(
+    payload: BookingCreate,
+    current_guest: User = Depends(require_guest),
+    db: Session = Depends(get_db),
+):
+    property_record = db.query(Property).filter(Property.id == payload.property_id).first()
+    if property_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found.",
+        )
+
+    if not property_record.is_available:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Property is not available for booking.",
+        )
+
+    if payload.checkout_date <= payload.checkin_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Checkout date must be after checkin date.",
+        )
+
+    if payload.checkin_date < date.today():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Checkin date cannot be in the past.",
+        )
+
+    total_nights = (payload.checkout_date - payload.checkin_date).days
+    total_price = total_nights * property_record.price_per_night
+
+    booking = Booking(
+        guest_id=current_guest.id,
+        property_id=payload.property_id,
+        checkin_date=payload.checkin_date,
+        checkout_date=payload.checkout_date,
+        total_price=total_price,
+        status="confirmed",
     )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return booking
 
 
 @router.get("/my", response_model=List[BookingResponse])

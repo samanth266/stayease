@@ -97,3 +97,4 @@ class ReviewResponse(ORMBaseModel):
     comment: str | None
     created_at: datetime
     reviewer_name: str
+    average_rating: float | None = None
