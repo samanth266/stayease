@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from database import Base, engine, get_db
 import models  # noqa: F401
 from routers.auth import router as auth_router
-from routers import bookings, properties, reviews
+from routers import bookings, properties, recommendations, reviews
 
 app = FastAPI(title="StayEase API", version="1.0.0")
 
@@ -38,6 +38,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(properties.router, prefix="/api")
 app.include_router(bookings.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
+app.include_router(recommendations.router, prefix="/api")
 
 @app.get("/")
 def root():
