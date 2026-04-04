@@ -1,0 +1,19 @@
+# Secrets — NEVER push
+.env
+azure-secrets.txt
+*.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Node
+node_modules/
+frontend/dist/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
