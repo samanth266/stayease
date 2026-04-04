@@ -1,1 +1,1 @@
-from . import auth, bookings, properties, reviews
+from . import auth, bookings, properties, recommendations, reviews
