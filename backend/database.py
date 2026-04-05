@@ -27,6 +27,7 @@ def _parse_adonet_connection_string(connection_string: str) -> Dict[str, str]:
 def _normalize_for_odbc(adonet_values: Dict[str, str]) -> Dict[str, str]:
     """Map common ADO.NET key aliases to ODBC-friendly names."""
     key_mapping = {
+        "server": "Server",
         "initial catalog": "Database",
         "database": "Database",
         "user id": "UID",
@@ -37,8 +38,16 @@ def _normalize_for_odbc(adonet_values: Dict[str, str]) -> Dict[str, str]:
         "connect timeout": "Connection Timeout",
     }
 
+    # These are valid for ADO.NET but can break pyodbc connection parsing.
+    unsupported_keys = {
+        "persist security info",
+        "multipleactiveresultsets",
+    }
+
     normalized: Dict[str, str] = {}
     for key, value in adonet_values.items():
+        if key.lower().strip() in unsupported_keys:
+            continue
         mapped_key = key_mapping.get(key.lower().strip(), key)
         normalized[mapped_key] = value
 

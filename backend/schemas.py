@@ -63,6 +63,7 @@ class PropertyResponse(ORMBaseModel):
     is_available: bool
     created_at: datetime
     average_rating: float | None = None
+    host: UserResponse | None = None
 
 
 class BookingCreate(BaseModel):
@@ -81,6 +82,19 @@ class BookingResponse(ORMBaseModel):
     status: str
     created_at: datetime
     property: PropertyResponse
+
+
+class HostBookingSummary(ORMBaseModel):
+    id: UUID
+    guest_name: str
+    property_title: str
+    property_location: str
+    property_photo_url: str | None = None
+    checkin_date: date
+    checkout_date: date
+    total_price: float
+    status: str
+    created_at: datetime
 
 
 class ReviewCreate(BaseModel):

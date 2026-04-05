@@ -9,6 +9,7 @@ function PropertyDetail() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [property, setProperty] = useState(null)
+  const [reviews, setReviews] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [checkinDate, setCheckinDate] = useState('')
@@ -35,11 +36,83 @@ function PropertyDetail() {
     return totalNights * Number(property.price_per_night)
   }, [property, totalNights])
 
+  const averageRating = useMemo(() => {
+    if (typeof property?.average_rating === 'number') {
+      return property.average_rating
+    }
+
+    if (reviews.length === 0) {
+      return 0
+    }
+
+    const sum = reviews.reduce((total, review) => total + Number(review.rating || 0), 0)
+    return sum / reviews.length
+  }, [property?.average_rating, reviews])
+
+  const propertyPhotos = useMemo(() => {
+    const candidatePhotos = Array.isArray(property?.photos)
+      ? property.photos
+      : Array.isArray(property?.photo_urls)
+        ? property.photo_urls
+        : []
+
+    const resolvedPhotos = candidatePhotos.filter(Boolean)
+
+    if (resolvedPhotos.length > 0) {
+      return resolvedPhotos
+    }
+
+    return property?.photo_url ? [property.photo_url] : []
+  }, [property])
+
+  const host = property?.host
+
+  const formatDisplayDate = (value) => {
+    if (!value) return 'Recently'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return 'Recently'
+    return new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(parsed)
+  }
+
+  const formatReviewDate = (value) => {
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return ''
+    return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(parsed)
+  }
+
+  const getInitials = (name = '') =>
+    name
+      .trim()
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join('') || 'SE'
+
+  const renderStars = (rating, className = 'h-4 w-4') =>
+    Array.from({ length: 5 }, (_, index) => (
+      <svg
+        key={index}
+        viewBox="0 0 24 24"
+        className={className}
+        fill={index < Math.round(rating) ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path d="M12 2.75l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.8l-5.88 3.09 1.12-6.55-4.76-4.64 6.58-.96L12 2.75Z" />
+      </svg>
+    ))
+
   useEffect(() => {
     const fetchProperty = async () => {
       try {
-        const response = await api.get(`/api/properties/${id}`)
-        setProperty(response.data)
+        const [propertyResponse, reviewsResponse] = await Promise.all([
+          api.get(`/api/properties/${id}`),
+          api.get(`/api/reviews/property/${id}`),
+        ])
+
+        setProperty(propertyResponse.data)
+        setReviews(reviewsResponse.data || [])
       } catch (err) {
         const message = err?.response?.data?.detail || 'Could not load property details.'
         setError(message)
@@ -55,6 +128,16 @@ function PropertyDetail() {
     event.preventDefault()
     setBookingError('')
     setBookingSuccess('')
+
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    if (user.role !== 'guest') {
+      setBookingError('Only guests can reserve stays.')
+      return
+    }
 
     if (!checkinDate || !checkoutDate) {
       setBookingError('Please select both check-in and check-out dates.')
@@ -87,112 +170,232 @@ function PropertyDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#faf7f5]">
       <Navbar />
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <Link to="/" className="mb-6 inline-flex items-center text-sm font-medium text-sky-700 hover:text-sky-800">
+      <main className="mx-auto w-full max-w-[1440px] px-6 py-8 lg:px-10 lg:py-10">
+        <Link to="/" className="inline-flex items-center text-sm font-semibold text-[#ff385c] transition hover:text-[#e62e53]">
           ← Back to listings
         </Link>
 
-        {isLoading ? <p className="text-slate-600">Loading property...</p> : null}
+        {isLoading ? <p className="mt-8 text-[#6a6a6a]">Loading property...</p> : null}
         {error ? (
-          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
+          <p className="mt-8 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
         ) : null}
 
         {!isLoading && property ? (
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <img
-              src={
-                property.photo_url ||
-                'https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=1600&auto=format&fit=crop'
-              }
-              alt={property.title}
-              className="h-72 w-full object-cover sm:h-96"
-            />
-
-            <div className="space-y-6 p-6 sm:p-8">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h1 className="text-3xl font-semibold text-slate-900">{property.title}</h1>
-                  <p className="mt-2 text-slate-600">{property.location}</p>
+          <section className="mt-6 space-y-8">
+            <div className="overflow-hidden rounded-[32px] bg-white shadow-[0_16px_50px_rgba(34,34,34,0.08)]">
+              {propertyPhotos.length > 1 ? (
+                <div className="grid max-h-[400px] gap-2 p-2 lg:grid-cols-4">
+                  <img
+                    src={propertyPhotos[0]}
+                    alt={property.title}
+                    className="h-[380px] w-full rounded-[24px] object-cover lg:col-span-2 lg:row-span-2 lg:h-full"
+                  />
+                  <img
+                    src={propertyPhotos[1] || propertyPhotos[0]}
+                    alt={property.title}
+                    className="hidden h-[186px] w-full rounded-[24px] object-cover lg:col-span-2 lg:block"
+                  />
+                  <img
+                    src={propertyPhotos[2] || propertyPhotos[1] || propertyPhotos[0]}
+                    alt={property.title}
+                    className="hidden h-[186px] w-full rounded-[24px] object-cover lg:col-span-2 lg:block"
+                  />
                 </div>
-                <span className="rounded-full bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700">
-                  ${property.price_per_night}/night
-                </span>
-              </div>
+              ) : (
+                <img
+                  src={propertyPhotos[0] || 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=1600&auto=format&fit=crop'}
+                  alt={property.title}
+                  className="max-h-[400px] w-full object-cover"
+                />
+              )}
+            </div>
 
-              <p className="leading-7 text-slate-700">{property.description || 'No description provided.'}</p>
-
-              {!user ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="mb-3 text-sm text-slate-600">Sign in to book this property.</p>
-                  <Link
-                    to="/login"
-                    className="inline-flex rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
-                  >
-                    Login to Book
-                  </Link>
-                </div>
-              ) : null}
-
-              {user?.role === 'guest' ? (
-                <form onSubmit={handleBookingSubmit} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <h2 className="text-lg font-semibold text-slate-900">Book this stay</h2>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,60%)_minmax(340px,40%)] lg:items-start">
+              <div className="space-y-8">
+                <section className="rounded-[32px] bg-white p-6 shadow-[0_16px_50px_rgba(34,34,34,0.08)] lg:p-8">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="checkin-date">
-                        Check-in
-                      </label>
-                      <input
-                        id="checkin-date"
-                        type="date"
-                        value={checkinDate}
-                        onChange={(event) => setCheckinDate(event.target.value)}
-                        required
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                      />
+                      <h1 className="text-2xl font-bold tracking-[-0.03em] text-[#222222] lg:text-4xl">{property.title}</h1>
+                      <div className="mt-3 flex items-center gap-2 text-[#6a6a6a]">
+                        <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#ff385c]" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 21s6-4.8 6-11a6 6 0 1 0-12 0c0 6.2 6 11 6 11Z" />
+                          <circle cx="12" cy="10" r="2.5" />
+                        </svg>
+                        <span className="text-sm font-medium">{property.location}</span>
+                      </div>
                     </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="checkout-date">
-                        Check-out
-                      </label>
-                      <input
-                        id="checkout-date"
-                        type="date"
-                        value={checkoutDate}
-                        onChange={(event) => setCheckoutDate(event.target.value)}
-                        required
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                      />
+
+                    <div className="flex items-center gap-2 rounded-full bg-[#fff1f4] px-4 py-2 text-[#ff385c]">
+                      <div className="flex items-center gap-1">{renderStars(averageRating, 'h-4 w-4')}</div>
+                      <span className="text-sm font-bold">
+                        {averageRating ? averageRating.toFixed(1) : 'New'}
+                      </span>
+                      <span className="text-sm text-[#6a6a6a]">({reviews.length})</span>
                     </div>
                   </div>
 
-                  <p className="mt-4 text-sm text-slate-700">
-                    Total: <span className="font-semibold">${totalPrice.toFixed(2)}</span>
-                    {totalNights > 0 ? ` for ${totalNights} night${totalNights > 1 ? 's' : ''}` : ''}
-                  </p>
+                  <div className="my-8 h-px bg-[#ececec]" />
 
-                  {bookingError ? (
-                    <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                      {bookingError}
-                    </p>
-                  ) : null}
-                  {bookingSuccess ? (
-                    <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                      {bookingSuccess}
-                    </p>
-                  ) : null}
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#ff385c] text-lg font-bold text-white">
+                      {getInitials(host?.name || 'StayEase')}
+                    </div>
+                    <div>
+                      <p className="text-lg font-semibold text-[#222222]">
+                        Hosted by {host?.name || 'StayEase Host'}
+                      </p>
+                      <p className="text-sm text-[#6a6a6a]">Joined {formatDisplayDate(host?.created_at)}</p>
+                    </div>
+                  </div>
 
-                  <button
-                    type="submit"
-                    disabled={isBooking}
-                    className="mt-4 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isBooking ? 'Booking...' : 'Book Now'}
-                  </button>
-                </form>
-              ) : null}
+                  <div className="my-8 h-px bg-[#ececec]" />
+
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#222222]">About this stay</h2>
+                    <p className="mt-4 whitespace-pre-line leading-8 text-[#5e5e5e]">
+                      {property.description || 'No description provided.'}
+                    </p>
+                  </div>
+
+                  <div className="my-8 h-px bg-[#ececec]" />
+
+                  <section>
+                    <div className="flex items-end justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#ff385c]">Reviews</p>
+                        <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[#222222]">
+                          Guest feedback
+                        </h2>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-4xl font-bold tracking-[-0.04em] text-[#222222]">
+                          {averageRating ? averageRating.toFixed(1) : '0.0'}
+                        </div>
+                        <div className="mt-1 flex items-center justify-end gap-1 text-[#ff385c]">
+                          {renderStars(averageRating, 'h-4 w-4')}
+                        </div>
+                      </div>
+                    </div>
+
+                    {reviews.length > 0 ? (
+                      <div className="mt-6 space-y-4">
+                        {reviews.map((review) => (
+                          <article key={review.id} className="rounded-2xl bg-[#faf7f5] p-5">
+                            <div className="flex items-start gap-4">
+                              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white font-bold text-[#ff385c] shadow-sm">
+                                {getInitials(review.reviewer_name)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div>
+                                    <p className="font-semibold text-[#222222]">{review.reviewer_name}</p>
+                                    <p className="text-sm text-[#6a6a6a]">{formatReviewDate(review.created_at)}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[#ff385c]">
+                                    {renderStars(review.rating, 'h-4 w-4')}
+                                  </div>
+                                </div>
+                                <p className="mt-3 leading-7 text-[#5e5e5e]">
+                                  {review.comment || 'No written comment provided.'}
+                                </p>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-5 rounded-2xl border border-[#ececec] bg-white px-4 py-6 text-sm text-[#6a6a6a] shadow-sm">
+                        No reviews yet. Be the first guest to share feedback.
+                      </p>
+                    )}
+                  </section>
+                </section>
+              </div>
+
+              <aside className="lg:sticky lg:top-28">
+                <div className="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_rgba(34,34,34,0.1)]">
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-3xl font-bold tracking-[-0.03em] text-[#222222]">
+                        ${Number(property.price_per_night).toFixed(0)}
+                        <span className="text-base font-normal text-[#6a6a6a]"> / night</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm font-semibold text-[#ff385c]">
+                      {renderStars(averageRating, 'h-4 w-4')}
+                      <span>{averageRating ? averageRating.toFixed(1) : 'New'}</span>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleBookingSubmit} className="mt-6 space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-[#6a6a6a]">
+                          Check in
+                        </span>
+                        <input
+                          type="date"
+                          value={checkinDate}
+                          onChange={(event) => setCheckinDate(event.target.value)}
+                          className="w-full rounded-xl border border-[#d8d8d8] bg-white px-4 py-3 text-[#222222] outline-none transition focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-[#6a6a6a]">
+                          Check out
+                        </span>
+                        <input
+                          type="date"
+                          value={checkoutDate}
+                          onChange={(event) => setCheckoutDate(event.target.value)}
+                          className="w-full rounded-xl border border-[#d8d8d8] bg-white px-4 py-3 text-[#222222] outline-none transition focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="space-y-3 rounded-2xl bg-[#faf7f5] p-4">
+                      <div className="flex items-center justify-between text-sm text-[#6a6a6a]">
+                        <span>Price</span>
+                        <span>${Number(property.price_per_night).toFixed(0)} x {totalNights || 0} nights</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-[#6a6a6a]">
+                        <span>Nights</span>
+                        <span>{totalNights || 0}</span>
+                      </div>
+                      <div className="h-px bg-[#e7e7e7]" />
+                      <div className="flex items-center justify-between text-base font-semibold text-[#222222]">
+                        <span>Total</span>
+                        <span>${totalPrice.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    {bookingError ? (
+                      <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {bookingError}
+                      </p>
+                    ) : null}
+                    {bookingSuccess ? (
+                      <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                        {bookingSuccess}
+                      </p>
+                    ) : null}
+
+                    <button
+                      type="submit"
+                      disabled={isBooking}
+                      className="w-full rounded-xl bg-[#FF385C] px-4 py-3.5 text-base font-bold text-white transition duration-200 hover:bg-[#e62e53] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isBooking ? 'Reserving...' : 'Reserve'}
+                    </button>
+
+                    <p className="text-center text-sm text-[#6a6a6a]">You won&apos;t be charged yet</p>
+                  </form>
+                </div>
+              </aside>
             </div>
           </section>
         ) : null}

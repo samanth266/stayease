@@ -5,10 +5,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from auth import require_guest
+from auth import require_guest, require_host
 from database import get_db
 from models import Booking, Property, User
-from schemas import BookingCreate, BookingResponse
+from schemas import BookingCreate, BookingResponse, HostBookingSummary
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -72,6 +72,43 @@ def get_my_bookings(
         .all()
     )
     return bookings
+
+
+@router.get("/host/recent", response_model=List[HostBookingSummary])
+def get_host_recent_bookings(
+    current_host: User = Depends(require_host),
+    db: Session = Depends(get_db),
+):
+    bookings = (
+        db.query(
+            Booking,
+            User.name.label("guest_name"),
+            Property.title.label("property_title"),
+            Property.location.label("property_location"),
+            Property.photo_url.label("property_photo_url"),
+        )
+        .join(Property, Property.id == Booking.property_id)
+        .join(User, User.id == Booking.guest_id)
+        .filter(Property.host_id == current_host.id)
+        .order_by(Booking.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": booking.id,
+            "guest_name": guest_name,
+            "property_title": property_title,
+            "property_location": property_location,
+            "property_photo_url": property_photo_url,
+            "checkin_date": booking.checkin_date,
+            "checkout_date": booking.checkout_date,
+            "total_price": booking.total_price,
+            "status": booking.status,
+            "created_at": booking.created_at,
+        }
+        for booking, guest_name, property_title, property_location, property_photo_url in bookings
+    ]
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)

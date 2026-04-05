@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import api from '../services/api'
 
@@ -6,6 +7,7 @@ function MyBookings() {
   const [bookings, setBookings] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('Upcoming')
   const [actionError, setActionError] = useState('')
   const [actionSuccess, setActionSuccess] = useState('')
   const [isCancellingId, setIsCancellingId] = useState('')
@@ -30,16 +32,52 @@ function MyBookings() {
     fetchBookings()
   }, [])
 
+  const today = useMemo(() => new Date(), [])
+
+  const formatDateRange = (checkinDate, checkoutDate) => {
+    const start = new Date(checkinDate)
+    const end = new Date(checkoutDate)
+    const formatter = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' })
+    return `${formatter.format(start)} → ${formatter.format(end)}`
+  }
+
+  const getBookingViewStatus = (booking) => {
+    const normalized = String(booking.status || '').toLowerCase()
+    if (normalized === 'cancelled') {
+      return 'Cancelled'
+    }
+
+    const checkout = new Date(booking.checkout_date)
+    const isPast = checkout < new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    return isPast ? 'Completed' : 'Upcoming'
+  }
+
+  const filteredBookings = useMemo(() => {
+    return bookings
+      .filter((booking) => getBookingViewStatus(booking) === activeTab)
+      .sort((a, b) => {
+        const firstDate = new Date(a.checkin_date).getTime()
+        const secondDate = new Date(b.checkin_date).getTime()
+        return activeTab === 'Completed' ? secondDate - firstDate : firstDate - secondDate
+      })
+  }, [activeTab, bookings, today])
+
+  const tabs = ['Upcoming', 'Completed', 'Cancelled']
+
   const getStatusStyles = (status) => {
     const normalized = String(status || '').toLowerCase()
     if (normalized === 'cancelled') {
-      return 'bg-rose-50 text-rose-700 border border-rose-100'
+      return 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
     }
     if (normalized === 'completed') {
-      return 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+      return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
     }
-    return 'bg-sky-50 text-sky-700 border border-sky-100'
+    return 'bg-[#fff1f4] text-[#ff385c] ring-1 ring-[#ffd1da]'
   }
+
+  const getPropertyPhoto = (booking) =>
+    booking.property?.photo_url ||
+    'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200&auto=format&fit=crop'
 
   const handleCancelBooking = async (bookingId) => {
     setActionError('')
@@ -104,96 +142,156 @@ function MyBookings() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#faf7f5]">
       <Navbar />
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-semibold text-slate-900">My Bookings</h1>
-        <p className="mt-2 text-slate-600">Track your upcoming stays and reservation status.</p>
+      <main className="mx-auto w-full max-w-[1280px] px-6 py-8 lg:px-10 lg:py-10">
+        <div className="max-w-3xl">
+          <p className="text-sm font-bold uppercase tracking-[0.28em] text-[#ff385c]">Trips</p>
+          <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#222222]">Trips</h1>
+          <p className="mt-3 text-base leading-7 text-[#6a6a6a]">
+            Track your upcoming stays, completed trips, and cancellations in one place.
+          </p>
+        </div>
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200 ${
+                activeTab === tab
+                  ? 'bg-[#222222] text-white shadow-sm'
+                  : 'bg-white text-[#444444] shadow-sm ring-1 ring-[#ececec] hover:text-[#ff385c]'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
 
         <div className="mt-8 space-y-4">
-          {isLoading ? <p className="text-slate-600">Loading bookings...</p> : null}
+          {isLoading ? <p className="text-[#6a6a6a]">Loading trips...</p> : null}
           {error ? (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
+            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
           ) : null}
           {actionError ? (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{actionError}</p>
+            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{actionError}</p>
           ) : null}
           {actionSuccess ? (
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{actionSuccess}</p>
+            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{actionSuccess}</p>
           ) : null}
 
-          {!isLoading && !error && bookings.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-slate-600">
-              You do not have any bookings yet.
+          {!isLoading && !error && filteredBookings.length === 0 ? (
+            <div className="rounded-[32px] bg-white px-6 py-14 text-center shadow-[0_16px_50px_rgba(34,34,34,0.08)]">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#fff1f4] text-3xl text-[#ff385c]">
+                ✈
+              </div>
+              <h2 className="mt-6 text-2xl font-bold tracking-[-0.03em] text-[#222222]">No trips yet</h2>
+              <p className="mt-3 text-[#6a6a6a]">Start exploring and book your next getaway.</p>
+              <Link
+                to="/"
+                className="mt-8 inline-flex rounded-full bg-[#FF385C] px-5 py-3 text-sm font-bold text-white transition duration-200 hover:bg-[#e62e53]"
+              >
+                Start exploring
+              </Link>
             </div>
           ) : null}
 
-          {bookings.map((booking) => (
-            <article key={booking.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">{booking.property?.title || 'Property booking'}</h2>
-                  <p className="text-sm text-slate-600">{booking.property?.location || 'Location unavailable'}</p>
+          {filteredBookings.map((booking) => {
+            const statusLabel = getBookingViewStatus(booking)
+            const isUpcoming = statusLabel === 'Upcoming'
+            const isCompleted = statusLabel === 'Completed'
+
+            return (
+              <article
+                key={booking.id}
+                className="overflow-hidden rounded-[28px] bg-white shadow-[0_14px_40px_rgba(34,34,34,0.08)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(34,34,34,0.12)]"
+              >
+                <div className="flex flex-col gap-0 md:flex-row">
+                  <div className="h-[220px] w-full md:h-auto md:w-[160px] md:flex-none">
+                    <img
+                      src={getPropertyPhoto(booking)}
+                      alt={booking.property?.title || 'Property'}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-5 md:p-6">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h2 className="text-xl font-bold tracking-[-0.02em] text-[#222222]">
+                          {booking.property?.title || 'Property booking'}
+                        </h2>
+                        <div className="mt-2 flex items-center gap-2 text-[#6a6a6a]">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#ff385c]" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 21s6-4.8 6-11a6 6 0 1 0-12 0c0 6.2 6 11 6 11Z" />
+                            <circle cx="12" cy="10" r="2.5" />
+                          </svg>
+                          <p className="text-sm font-medium">{booking.property?.location || 'Location unavailable'}</p>
+                        </div>
+                      </div>
+
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] ${getStatusStyles(booking.status)}`}>
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-[#5e5e5e]">
+                      <span>{formatDateRange(booking.checkin_date, booking.checkout_date)}</span>
+                      <span className="text-[#c7c7c7]">•</span>
+                      <span>${Number(booking.total_price).toFixed(2)}</span>
+                    </div>
+
+                    <div className="mt-4 flex flex-1 items-end justify-end gap-2">
+                      {isUpcoming ? (
+                        <button
+                          type="button"
+                          onClick={() => handleCancelBooking(booking.id)}
+                          disabled={isCancellingId === booking.id}
+                          className="rounded-full border border-[#ff385c] px-4 py-2.5 text-sm font-semibold text-[#ff385c] transition duration-200 hover:bg-[#fff1f4] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isCancellingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                        </button>
+                      ) : null}
+
+                      {isCompleted ? (
+                        <button
+                          type="button"
+                          onClick={() => openReviewModal(booking)}
+                          className="rounded-full border border-[#d8d8d8] px-4 py-2.5 text-sm font-semibold text-[#222222] transition duration-200 hover:bg-[#fafafa]"
+                        >
+                          Review
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${getStatusStyles(booking.status)}`}>
-                  {booking.status}
-                </span>
-              </div>
-
-              <div className="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-3">
-                <p>
-                  <span className="font-medium">Check-in:</span> {booking.checkin_date}
-                </p>
-                <p>
-                  <span className="font-medium">Check-out:</span> {booking.checkout_date}
-                </p>
-                <p>
-                  <span className="font-medium">Total:</span> ${booking.total_price}
-                </p>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleCancelBooking(booking.id)}
-                  disabled={booking.status === 'cancelled' || isCancellingId === booking.id}
-                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isCancellingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openReviewModal(booking)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  Leave Review
-                </button>
-              </div>
-            </article>
-          ))}
+              </article>
+            )
+          })}
         </div>
       </main>
 
       {reviewModalBooking ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <h2 className="text-xl font-semibold text-slate-900">Review your stay</h2>
-            <p className="mt-1 text-sm text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#222222]/55 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-[0_24px_60px_rgba(0,0,0,0.22)]">
+            <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#222222]">Review your stay</h2>
+            <p className="mt-1 text-sm text-[#6a6a6a]">
               {reviewModalBooking.property?.title || 'Property'}
             </p>
 
             <form className="mt-5 space-y-4" onSubmit={submitReview}>
               <div>
-                <p className="mb-2 text-sm font-medium text-slate-700">Your rating</p>
-                <div className="flex items-center gap-1">
+                <p className="mb-3 text-sm font-medium text-[#222222]">Your rating</p>
+                <div className="flex items-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       type="button"
                       onClick={() => setRating(star)}
-                      className={`text-2xl transition ${rating >= star ? 'text-amber-400' : 'text-slate-300 hover:text-amber-300'}`}
+                      className={`text-4xl transition duration-200 ${rating >= star ? 'text-[#FF385C]' : 'text-[#d8d8d8] hover:text-[#ff9eb0]'}`}
                       aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
                     >
                       ★
@@ -203,7 +301,7 @@ function MyBookings() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="review-comment">
+                <label className="mb-2 block text-sm font-medium text-[#222222]" htmlFor="review-comment">
                   Comment (optional)
                 </label>
                 <textarea
@@ -211,23 +309,23 @@ function MyBookings() {
                   rows="4"
                   value={comment}
                   onChange={(event) => setComment(event.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                  className="w-full rounded-xl border border-[#d8d8d8] px-4 py-3 text-[#222222] outline-none transition placeholder:text-[#9a9a9a] focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
                   placeholder="Tell others what you liked about your stay"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-1">
+              <div className="flex items-center justify-end gap-3 pt-1">
                 <button
                   type="button"
                   onClick={closeReviewModal}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-xl border border-[#d8d8d8] bg-white px-4 py-2.5 text-sm font-semibold text-[#222222] transition duration-200 hover:bg-[#fafafa]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReview}
-                  className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[#FF385C] px-4 py-2.5 text-sm font-bold text-white transition duration-200 hover:bg-[#e62e53] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
                 </button>

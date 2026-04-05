@@ -7,6 +7,7 @@ from azure.core.exceptions import AzureError
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobSasPermissions, BlobServiceClient, ContentSettings, generate_blob_sas
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 
 from auth import require_host
@@ -95,7 +96,7 @@ def list_properties(
     max_price: float | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Property).filter(Property.is_available == True)
+    query = db.query(Property).options(joinedload(Property.host)).filter(Property.is_available == True)
 
     if location:
         query = query.filter(Property.location.ilike(f"%{location}%"))
@@ -129,7 +130,12 @@ def create_property(
 
 @router.get("/{property_id}", response_model=PropertyResponse)
 def get_property(property_id: UUID, db: Session = Depends(get_db)):
-    property_record = db.query(Property).filter(Property.id == property_id).first()
+    property_record = (
+        db.query(Property)
+        .options(joinedload(Property.host))
+        .filter(Property.id == property_id)
+        .first()
+    )
     if property_record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
