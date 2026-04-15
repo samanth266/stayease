@@ -36,123 +36,91 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#faf7f5] px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-[36px] bg-white shadow-[0_24px_70px_rgba(34,34,34,0.12)] lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#FF385C] via-[#ff546f] to-[#E61E4D] p-10 text-white lg:flex lg:flex-col lg:justify-between">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.14),transparent_25%)]" />
-            <div className="relative">
-              <p className="text-sm font-bold uppercase tracking-[0.28em] text-white/85">StayEase</p>
-              <h1 className="mt-6 max-w-md text-5xl font-extrabold tracking-[-0.05em]">Welcome to StayEase</h1>
-              <p className="mt-5 max-w-sm text-lg leading-8 text-white/90">
-                Sign in to manage trips, hosts, and bookings with a clean Airbnb-inspired experience.
-              </p>
-            </div>
-
-            <div className="relative space-y-4">
-              <div className="rounded-[28px] bg-white/12 p-5 backdrop-blur-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/70">Fast access</p>
-                <p className="mt-2 text-2xl font-bold">Bookings, hosting, and messages in one place.</p>
-              </div>
-            </div>
+  <div style={{display:'flex', minHeight:'100vh'}}>
+    <div style={{display:'none', flex:1, background:'linear-gradient(135deg, #FF385C 0%, #c2185b 100%)', alignItems:'center', justifyContent:'center', padding:'64px 48px'}} className="lg:flex">
+      <div style={{color:'white', maxWidth:'360px'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'32px'}}>
+          <div style={{width:'48px', height:'48px', background:'rgba(255,255,255,0.2)', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center'}}>
+            <svg viewBox="0 0 24 24" style={{width:'28px', height:'28px'}} fill="white"><path d="M12 3L2 12h3v9h6v-5h2v5h6v-9h3z"/></svg>
           </div>
-
-          <div className="px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
-            <div className="text-center lg:text-left">
-              <p className="text-sm font-bold uppercase tracking-[0.28em] text-[#ff385c]">StayEase</p>
-              <h2 className="mt-4 text-3xl font-extrabold tracking-[-0.04em] text-[#222222] sm:text-4xl">
-                Sign in
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-[#6a6a6a]">Log in to continue your stay planning.</p>
-            </div>
-
-            <div className="my-7 flex items-center gap-4">
-              <div className="h-px flex-1 bg-[#ececec]" />
-              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8a8a8a]">or</span>
-              <div className="h-px flex-1 bg-[#ececec]" />
-            </div>
-
-            <form className="space-y-5" onSubmit={handleSubmit}>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#222222]" htmlFor="email">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-[#d8d8d8] bg-white px-4 py-3 text-[#222222] outline-none transition placeholder:text-[#9a9a9a] focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
-                  placeholder="you@example.com"
-                />
+          <span style={{fontSize:'28px', fontWeight:'800', letterSpacing:'-0.5px'}}>StayEase</span>
+        </div>
+        <h2 style={{fontSize:'28px', fontWeight:'700', marginBottom:'12px', lineHeight:'1.2'}}>Find your perfect stay</h2>
+        <p style={{fontSize:'16px', opacity:'0.85', marginBottom:'40px', lineHeight:'1.6'}}>Join thousands of travelers discovering amazing places around the world.</p>
+        <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+          {['Thousands of unique stays', 'Verified hosts worldwide', 'Book with confidence', 'Secure payments'].map(item => (
+            <div key={item} style={{display:'flex', alignItems:'center', gap:'12px'}}>
+              <div style={{width:'24px', height:'24px', borderRadius:'50%', background:'rgba(255,255,255,0.25)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                <svg viewBox="0 0 24 24" style={{width:'14px', height:'14px'}} fill="none" stroke="white" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
               </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#222222]" htmlFor="password">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-[#d8d8d8] bg-white px-4 py-3 pr-12 text-[#222222] outline-none transition placeholder:text-[#9a9a9a] focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute inset-y-0 right-3 flex items-center text-[#7a7a7a] transition hover:text-[#222222]"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? (
-                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M3 3l18 18" />
-                        <path d="M10.58 10.58A2 2 0 0 0 13.42 13.42" />
-                        <path d="M9.88 5.07A10.5 10.5 0 0 1 12 4.75c5.5 0 9.5 7.25 9.5 7.25a19.4 19.4 0 0 1-4.34 5.14" />
-                        <path d="M6.61 6.61A19.4 19.4 0 0 0 2.5 12S6.5 19.25 12 19.25c1.04 0 2.06-.14 3.01-.41" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M2 12s3.75-7.25 10-7.25S22 12 22 12s-3.75 7.25-10 7.25S2 12 2 12Z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {error ? (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={isSubmitting || isLoading}
-                className="w-full rounded-xl bg-[#FF385C] px-4 py-3.5 text-sm font-bold text-white transition duration-200 hover:bg-[#e62e53] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSubmitting ? 'Signing in...' : 'Continue'}
-              </button>
-            </form>
-
-            <p className="mt-6 text-center text-sm text-[#6a6a6a] lg:text-left">
-              Don&apos;t have an account?{' '}
-              <Link to="/register" className="font-semibold text-[#FF385C] transition hover:text-[#e62e53]">
-                Sign up
-              </Link>
-            </p>
-          </div>
+              <span style={{fontSize:'15px', opacity:'0.92'}}>{item}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
-  )
+
+    <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', background:'white', padding:'48px 24px'}}>
+      <div style={{width:'100%', maxWidth:'400px'}}>
+        <div style={{marginBottom:'32px'}}>
+          <h1 style={{fontSize:'32px', fontWeight:'800', color:'#111827', marginBottom:'8px', letterSpacing:'-0.5px'}}>Welcome back</h1>
+          <p style={{fontSize:'15px', color:'#6b7280'}}>Sign in to your StayEase account</p>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:'20px'}}>
+          <div>
+            <label style={{display:'block', fontSize:'14px', fontWeight:'600', color:'#374151', marginBottom:'8px'}} htmlFor="email">Email address</label>
+            <input
+              id="email" name="email" type="email" autoComplete="email" required
+              value={formData.email} onChange={handleChange}
+              placeholder="you@example.com"
+              style={{width:'100%', padding:'12px 16px', border:'1.5px solid #e5e7eb', borderRadius:'12px', fontSize:'15px', color:'#111827', outline:'none', boxSizing:'border-box', transition:'border-color 0.2s'}}
+              onFocus={e => e.target.style.borderColor='#FF385C'}
+              onBlur={e => e.target.style.borderColor='#e5e7eb'}
+            />
+          </div>
+
+          <div>
+            <label style={{display:'block', fontSize:'14px', fontWeight:'600', color:'#374151', marginBottom:'8px'}} htmlFor="password">Password</label>
+            <div style={{position:'relative'}}>
+              <input
+                id="password" name="password" type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password" required
+                value={formData.password} onChange={handleChange}
+                placeholder="Enter your password"
+                style={{width:'100%', padding:'12px 48px 12px 16px', border:'1.5px solid #e5e7eb', borderRadius:'12px', fontSize:'15px', color:'#111827', outline:'none', boxSizing:'border-box', transition:'border-color 0.2s'}}
+                onFocus={e => e.target.style.borderColor='#FF385C'}
+                onBlur={e => e.target.style.borderColor='#e5e7eb'}
+              />
+              <button type="button" onClick={() => setShowPassword(p => !p)}
+                style={{position:'absolute', right:'14px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#9ca3af', padding:'4px'}}>
+                {showPassword
+                  ? <svg viewBox="0 0 24 24" style={{width:'20px', height:'20px'}} fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l18 18M10.58 10.58A2 2 0 0 0 13.42 13.42M9.88 5.07A10.5 10.5 0 0 1 12 4.75c5.5 0 9.5 7.25 9.5 7.25a19.4 19.4 0 0 1-4.34 5.14M6.61 6.61A19.4 19.4 0 0 0 2.5 12S6.5 19.25 12 19.25"/></svg>
+                  : <svg viewBox="0 0 24 24" style={{width:'20px', height:'20px'}} fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.75-7.25 10-7.25S22 12 22 12s-3.75 7.25-10 7.25S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                }
+              </button>
+            </div>
+          </div>
+
+          {error && <div style={{padding:'12px 16px', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'10px', fontSize:'14px', color:'#dc2626'}}>{error}</div>}
+
+          <button type="submit" disabled={isSubmitting || isLoading}
+            style={{width:'100%', padding:'14px', background:'#FF385C', color:'white', border:'none', borderRadius:'12px', fontSize:'16px', fontWeight:'700', cursor:'pointer', transition:'background 0.2s', opacity: (isSubmitting || isLoading) ? 0.6 : 1}}
+            onMouseOver={e => e.target.style.background='#e01f48'}
+            onMouseOut={e => e.target.style.background='#FF385C'}
+          >
+            {isSubmitting ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+
+        <p style={{textAlign:'center', fontSize:'14px', color:'#6b7280', marginTop:'24px'}}>
+          New to StayEase?{' '}
+          <Link to="/register" style={{color:'#FF385C', fontWeight:'600', textDecoration:'none'}}>Create an account</Link>
+        </p>
+      </div>
+    </div>
+  </div>
+)
 }
 
 export default Login

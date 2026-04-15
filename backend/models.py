@@ -61,6 +61,25 @@ class Property(Base):
     host = relationship("User", back_populates="hosted_properties", foreign_keys=[host_id])
     bookings = relationship("Booking", back_populates="property")
     reviews = relationship("Review", back_populates="property")
+    photos = relationship(
+        "PropertyPhoto",
+        back_populates="property",
+        cascade="all, delete-orphan",
+        order_by="PropertyPhoto.created_at",
+    )
+
+
+class PropertyPhoto(Base):
+    __tablename__ = "property_photos"
+
+    id = Column(UNIQUEIDENTIFIER(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id = Column(
+        UNIQUEIDENTIFIER(as_uuid=True), ForeignKey("properties.id"), nullable=False
+    )
+    photo_url = Column(String(500), nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    property = relationship("Property", back_populates="photos", foreign_keys=[property_id])
 
 
 class Booking(Base):

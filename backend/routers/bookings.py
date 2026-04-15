@@ -1,16 +1,84 @@
+from datetime import datetime, timedelta, timezone
 from datetime import date
 from typing import List
+from urllib.parse import urlparse
 from uuid import UUID
 
+from azure.core.exceptions import AzureError
+from azure.identity import DefaultAzureCredential
+from azure.storage.blob import BlobSasPermissions, BlobServiceClient, generate_blob_sas
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from auth import require_guest, require_host
 from database import get_db
 from models import Booking, Property, User
+from keyvault import settings
 from schemas import BookingCreate, BookingResponse, HostBookingSummary
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
+
+PHOTO_CONTAINER_NAME = "photos"
+
+
+def _extract_blob_name(photo_url: str) -> str | None:
+    if not photo_url:
+        return None
+
+    parsed_url = urlparse(photo_url)
+    if not parsed_url.scheme and not parsed_url.netloc:
+        normalized = photo_url.lstrip("/")
+        container_prefix = f"{PHOTO_CONTAINER_NAME}/"
+        if normalized.startswith(container_prefix):
+            return normalized[len(container_prefix):]
+        return normalized
+
+    path = parsed_url.path.lstrip("/")
+    container_prefix = f"{PHOTO_CONTAINER_NAME}/"
+    if path.startswith(container_prefix):
+        return path[len(container_prefix):]
+
+    return None
+
+
+def _sign_bookings_property_photo_urls(bookings: list[Booking]) -> None:
+    if not bookings:
+        return
+
+    try:
+        account_url = f"https://{settings.blob_account_name}.blob.core.windows.net"
+        blob_service_client = BlobServiceClient(account_url=account_url, credential=DefaultAzureCredential())
+        start_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+        expiry_time = datetime.now(timezone.utc) + timedelta(hours=24)
+        delegation_key = blob_service_client.get_user_delegation_key(start_time, expiry_time)
+    except AzureError:
+        return
+
+    for booking in bookings:
+        property_record = booking.property
+        if not property_record or not property_record.photo_url:
+            continue
+
+        blob_name = _extract_blob_name(property_record.photo_url)
+        if not blob_name:
+            continue
+
+        try:
+            sas_token = generate_blob_sas(
+                account_name=settings.blob_account_name,
+                container_name=PHOTO_CONTAINER_NAME,
+                blob_name=blob_name,
+                user_delegation_key=delegation_key,
+                permission=BlobSasPermissions(read=True),
+                expiry=expiry_time,
+                start=start_time,
+            )
+            property_record.photo_url = (
+                f"https://{settings.blob_account_name}.blob.core.windows.net/"
+                f"{PHOTO_CONTAINER_NAME}/{blob_name}?{sas_token}"
+            )
+        except AzureError:
+            continue
 
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
@@ -68,9 +136,11 @@ def get_my_bookings(
 ):
     bookings = (
         db.query(Booking)
+        .options(joinedload(Booking.property))
         .filter(Booking.guest_id == current_guest.id)
         .all()
     )
+    _sign_bookings_property_photo_urls(bookings)
     return bookings
 
 
@@ -97,6 +167,7 @@ def get_host_recent_bookings(
     return [
         {
             "id": booking.id,
+            "property_id": booking.property_id,
             "guest_name": guest_name,
             "property_title": property_title,
             "property_location": property_location,

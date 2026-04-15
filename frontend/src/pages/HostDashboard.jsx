@@ -30,21 +30,91 @@ function HostDashboard() {
     price_per_night: '',
     location: '',
   })
-  const [photoFile, setPhotoFile] = useState(null)
+  const [photoFiles, setPhotoFiles] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  const [cardImageIndexByProperty, setCardImageIndexByProperty] = useState({})
   const fileInputRef = useRef(null)
 
+  const getPropertyPhotos = (property) => {
+    const galleryPhotos = Array.isArray(property?.photos)
+      ? property.photos
+        .map((photo) => (typeof photo === 'string' ? photo : photo?.photo_url || photo?.url))
+        .filter(Boolean)
+      : []
+
+    if (galleryPhotos.length > 0) {
+      return galleryPhotos
+    }
+
+    return property?.photo_url ? [property.photo_url] : [propertyFallbackImage]
+  }
+
+  const getCardImageIndex = (propertyId, photoCount) => {
+    const currentIndex = cardImageIndexByProperty[propertyId] ?? 0
+    if (photoCount <= 0) return 0
+    return Math.min(currentIndex, photoCount - 1)
+  }
+
+  const showPreviousCardPhoto = (propertyId, photoCount) => {
+    if (photoCount <= 1) return
+    setCardImageIndexByProperty((prev) => {
+      const current = prev[propertyId] ?? 0
+      return {
+        ...prev,
+        [propertyId]: current === 0 ? photoCount - 1 : current - 1,
+      }
+    })
+  }
+
+  const showNextCardPhoto = (propertyId, photoCount) => {
+    if (photoCount <= 1) return
+    setCardImageIndexByProperty((prev) => {
+      const current = prev[propertyId] ?? 0
+      return {
+        ...prev,
+        [propertyId]: current === photoCount - 1 ? 0 : current + 1,
+      }
+    })
+  }
+
+  const loadProperties = async () => {
+    const propertiesResponse = await api.get('/api/properties')
+    const baseProperties = propertiesResponse.data
+
+    if (!user) {
+      setProperties(baseProperties)
+      return
+    }
+
+    const hostOwned = baseProperties.filter((property) => property.host_id === user.id)
+    const detailedHostProperties = await Promise.all(
+      hostOwned.map(async (property) => {
+        try {
+          const detailResponse = await api.get(`/api/properties/${property.id}`)
+          return detailResponse.data
+        } catch {
+          return property
+        }
+      })
+    )
+
+    const detailedById = new Map(detailedHostProperties.map((property) => [property.id, property]))
+    setProperties(baseProperties.map((property) => detailedById.get(property.id) || property))
+  }
+
   useEffect(() => {
+    if (!user) return
+
     const fetchDashboardData = async () => {
       try {
-        const [propertiesResponse, bookingsResponse] = await Promise.all([
-          api.get('/api/properties'),
-          api.get('/api/bookings/host/recent'),
-        ])
-
-        setProperties(propertiesResponse.data)
-        setBookings(bookingsResponse.data)
+        await loadProperties()
+        try {
+          const bookingsResponse = await api.get('/api/bookings/host/recent')
+          setBookings(bookingsResponse.data)
+        } catch {
+          setBookings([])
+        }
       } catch (err) {
         const message = err?.response?.data?.detail || 'Could not load dashboard data.'
         setError(message)
@@ -54,7 +124,7 @@ function HostDashboard() {
     }
 
     fetchDashboardData()
-  }, [])
+  }, [user])
 
   const hostProperties = useMemo(() => {
     if (!user) {
@@ -64,9 +134,28 @@ function HostDashboard() {
     return properties.filter((property) => property.host_id === user.id)
   }, [properties, user])
 
-  const availableProperties = useMemo(
-    () => hostProperties.filter((property) => property.is_available),
-    [hostProperties]
+  const activeBookingPropertyIds = useMemo(() => {
+    const activeStatuses = new Set(['cancelled', 'completed'])
+    const ids = new Set()
+
+    bookings.forEach((booking) => {
+      const normalizedStatus = String(booking.status || '').toLowerCase()
+      if (!activeStatuses.has(normalizedStatus) && booking.property_id) {
+        ids.add(String(booking.property_id))
+      }
+    })
+
+    return ids
+  }, [bookings])
+
+  const availableNowCount = useMemo(
+    () => hostProperties.filter((property) => property.is_available && !activeBookingPropertyIds.has(String(property.id))).length,
+    [activeBookingPropertyIds, hostProperties]
+  )
+
+  const activeBookingsCount = useMemo(
+    () => bookings.filter((booking) => String(booking.status || '').toLowerCase() !== 'cancelled').length,
+    [bookings]
   )
 
   const metrics = useMemo(
@@ -78,17 +167,17 @@ function HostDashboard() {
       },
       {
         label: 'Total bookings',
-        value: bookings.length,
+        value: activeBookingsCount,
         icon: '🧳',
       },
       {
         label: 'Properties available',
-        value: availableProperties.length,
+        value: availableNowCount,
         icon: '✓',
       },
     ],
-        [availableProperties.length, bookings.length, hostProperties.length]
-    )
+    [activeBookingsCount, availableNowCount, hostProperties.length]
+  )
 
   const recentBookings = useMemo(() => bookings.slice(0, 8), [bookings])
 
@@ -119,27 +208,42 @@ function HostDashboard() {
       .map((part) => part[0].toUpperCase())
       .join('') || 'SE'
   const openDrawer = () => {
+    setEditingProperty(null)
     setFormData({
       title: '',
       description: '',
       price_per_night: '',
       location: '',
     })
-    setPhotoFile(null)
+    setPhotoFiles([])
     setFormError('')
     setIsDrawerOpen(true)
   }
 
   const closeDrawer = () => {
     setIsDrawerOpen(false)
+    setEditingProperty(null)
     setFormData({
       title: '',
       description: '',
       price_per_night: '',
       location: '',
     })
-    setPhotoFile(null)
+    setPhotoFiles([])
     setFormError('')
+  }
+
+  const openEditDrawer = (property) => {
+    setEditingProperty(property)
+    setFormData({
+      title: property.title || '',
+      description: property.description || '',
+      price_per_night: String(property.price_per_night ?? ''),
+      location: property.location || '',
+    })
+    setPhotoFiles([])
+    setFormError('')
+    setIsDrawerOpen(true)
   }
 
   const handleSubmit = async (e) => {
@@ -148,29 +252,38 @@ function HostDashboard() {
     setSubmitting(true)
 
     try {
-      // Step 1: Create property
-      const res = await api.post('/api/properties', {
+      const payload = {
         title: formData.title,
         description: formData.description,
         price_per_night: parseFloat(formData.price_per_night),
         location: formData.location,
-      })
-      const newProperty = res.data
-
-      // Step 2: Upload photo if selected
-      if (photoFile) {
-        const fd = new FormData()
-        fd.append('photo', photoFile)
-        await api.post(`/api/properties/${newProperty.id}/photos`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
       }
 
-      // Step 3: Refresh properties list
-      setProperties([...properties, newProperty])
+      if (editingProperty) {
+        await api.patch(`/api/properties/${editingProperty.id}`, payload)
+        for (const photoFile of photoFiles) {
+          const fd = new FormData()
+          fd.append('photo', photoFile)
+          await api.post(`/api/properties/${editingProperty.id}/photos`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+        }
+      } else {
+        const res = await api.post('/api/properties', payload)
+        const newProperty = res.data
+        for (const photoFile of photoFiles) {
+          const fd = new FormData()
+          fd.append('photo', photoFile)
+          await api.post(`/api/properties/${newProperty.id}/photos`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+        }
+      }
+
+      await loadProperties()
       closeDrawer()
     } catch (err) {
-      setFormError(err.response?.data?.detail || 'Failed to create listing')
+      setFormError(err.response?.data?.detail || 'Failed to save listing')
     } finally {
       setSubmitting(false)
     }
@@ -200,29 +313,31 @@ function HostDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#faf7f5]">
+    <div className="min-h-screen bg-white overflow-visible">
       <Navbar />
 
       <main className="mx-auto w-full max-w-[1440px] px-6 py-8 lg:px-10 lg:py-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.28em] text-[#ff385c]">Host Dashboard</p>
-            <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#222222]">Host Dashboard</h1>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-[#6a6a6a]">
-              Manage your listings, review activity, and stay on top of guest demand.
-            </p>
+        <section className="relative -mx-2 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#FFDEE6] via-[#ffd3de] to-[#ffc2d1] px-8 py-9 sm:mx-0 lg:px-12 lg:py-11">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.28),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(255,255,255,0.2),transparent_28%)]" />
+          <div className="relative flex flex-wrap items-center justify-between gap-6">
+            <div>
+              <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#E61E4D]">Host Dashboard</h1>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[#b31942]">
+                Manage your listings, review activity, and stay on top of guest demand.
+              </p>
+            </div>
+            <Link
+              to="/"
+              className="rounded-full bg-[#FF385C] px-5 py-3 text-sm font-bold text-white transition duration-200 hover:bg-[#e62e53]"
+            >
+              Browse all properties
+            </Link>
           </div>
-          <Link
-            to="/"
-            className="rounded-full bg-[#FF385C] px-5 py-3 text-sm font-bold text-white transition duration-200 hover:bg-[#e62e53]"
-          >
-            Browse all properties
-          </Link>
-        </div>
+        </section>
 
         <section className="mt-8 grid gap-4 lg:grid-cols-3">
           {metrics.map((metric) => (
-            <div key={metric.label} className="rounded-[28px] bg-white p-6 shadow-[0_16px_50px_rgba(34,34,34,0.08)]">
+            <div key={metric.label} className="rounded-[28px] border border-[#ececec] bg-white/95 p-6 shadow-[0_12px_32px_rgba(34,34,34,0.08)] backdrop-blur">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff1f4] text-xl">
@@ -239,8 +354,7 @@ function HostDashboard() {
         <section className="mt-12">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.24em] text-[#ff385c]">Your listings</p>
-              <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[#222222]">Your listings</h2>
+              <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#222222]">Your listings</h2>
             </div>
             <button
               type="button"
@@ -258,7 +372,7 @@ function HostDashboard() {
           {isLoading ? <p className="mt-6 text-[#6a6a6a]">Loading your listings...</p> : null}
 
           {!isLoading && !error && hostProperties.length === 0 ? (
-            <div className="mt-6 rounded-[32px] bg-white px-6 py-14 text-center shadow-[0_16px_50px_rgba(34,34,34,0.08)]">
+            <div className="mt-6 rounded-[32px] border border-[#ececec] bg-white/95 px-6 py-14 text-center shadow-[0_12px_32px_rgba(34,34,34,0.08)] backdrop-blur">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#fff1f4] text-2xl text-[#ff385c]">
                 🏡
               </div>
@@ -277,63 +391,111 @@ function HostDashboard() {
           {hostProperties.length > 0 ? (
             <div className="mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {hostProperties.map((property) => (
-                <article
-                  key={property.id}
-                  className="group overflow-hidden rounded-[28px] bg-white shadow-[0_16px_50px_rgba(34,34,34,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(34,34,34,0.12)]"
-                >
-                  <div className="relative">
-                    <img
-                      src={property.photo_url || propertyFallbackImage}
-                      alt={property.title}
-                      className="h-72 w-full object-cover transition duration-500 group-hover:scale-105"
-                    />
-                  </div>
+                (() => {
+                  const propertyPhotos = getPropertyPhotos(property)
+                  const currentCardPhotoIndex = getCardImageIndex(property.id, propertyPhotos.length)
+                  return (
+                    <article
+                      key={property.id}
+                      className="group overflow-hidden rounded-[24px] border border-[#ececec] bg-white/95 shadow-[0_10px_28px_rgba(34,34,34,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_14px_36px_rgba(34,34,34,0.12)]"
+                    >
+                      {/* Image */}
+                      <div className="relative aspect-[4/3] overflow-hidden">
+                        <div className="relative block h-full w-full">
+                          <img
+                            src={propertyPhotos[currentCardPhotoIndex] || propertyFallbackImage}
+                            alt={`${property.title} image ${currentCardPhotoIndex + 1}`}
+                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                          />
+                          <span className="absolute bottom-3 left-3 rounded-full bg-[#222222]/70 px-3 py-1 text-xs font-semibold text-white">
+                            {propertyPhotos.length > 1
+                              ? `${currentCardPhotoIndex + 1}/${propertyPhotos.length}`
+                              : 'View photo'}
+                          </span>
+                        </div>
 
-                  <div className="space-y-3 p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-bold text-[#222222]">{property.location}</p>
-                        <h3 className="mt-1 line-clamp-1 text-sm text-[#6a6a6a]">{property.title}</h3>
+                        {propertyPhotos.length > 1 ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                showPreviousCardPhoto(property.id, propertyPhotos.length)
+                              }}
+                              className="absolute left-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-lg text-[#222222] shadow-sm transition hover:bg-white"
+                              aria-label={`Previous image for ${property.title}`}
+                            >
+                              ‹
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                showNextCardPhoto(property.id, propertyPhotos.length)
+                              }}
+                              className="absolute right-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-lg text-[#222222] shadow-sm transition hover:bg-white"
+                              aria-label={`Next image for ${property.title}`}
+                            >
+                              ›
+                            </button>
+                          </>
+                        ) : null}
                       </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] ${
-                          property.is_available
-                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                            : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
-                        }`}
-                      >
-                        {property.is_available ? 'Available' : 'Hidden'}
-                      </span>
-                    </div>
 
-                    <p className="text-base font-bold text-[#222222]">
-                      ${property.price_per_night} <span className="font-normal text-[#6a6a6a]">per night</span>
-                    </p>
+                      {/* Content */}
+                      <div className="p-4 space-y-3">
+                        {/* Title + Status */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-[#222222] truncate">{property.location}</p>
+                            <p className="text-xs text-[#6a6a6a] truncate mt-0.5">{property.title}</p>
+                          </div>
+                          <span className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${!property.is_available
+                            ? 'bg-rose-50 text-rose-600'
+                            : activeBookingPropertyIds.has(String(property.id))
+                              ? 'bg-amber-50 text-amber-600'
+                              : 'bg-emerald-50 text-emerald-600'
+                            }`}>
+                            {!property.is_available ? 'Hidden' : activeBookingPropertyIds.has(String(property.id)) ? 'Booked' : 'Available'}
+                          </span>
+                        </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                      <button
-                        type="button"
-                        className="rounded-full border border-[#d8d8d8] px-4 py-2 text-sm font-semibold text-[#222222] transition hover:bg-[#fafafa]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteProperty(property.id)}
-                        disabled={deletingId === property.id}
-                        className="rounded-full border border-[#ff385c] px-4 py-2 text-sm font-semibold text-[#ff385c] transition hover:bg-[#fff1f4] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {deletingId === property.id ? 'Deleting...' : 'Delete'}
-                      </button>
-                    </div>
-                  </div>
-                </article>
+                        {/* Price */}
+                        <p className="text-sm font-bold text-[#222222]">
+                          <span className="text-[#FF385C]">${property.price_per_night}</span>
+                          <span className="font-normal text-[#6a6a6a] text-xs"> / night</span>
+                        </p>
+
+                        {/* Actions */}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditDrawer(property)}
+                            className="flex-1 rounded-xl border border-[#e0e0e0] py-2 text-xs font-semibold text-[#444] transition hover:bg-[#f5f5f5]"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProperty(property.id)}
+                            disabled={deletingId === property.id}
+                            className="flex-1 rounded-xl border border-[#FF385C] py-2 text-xs font-semibold text-[#FF385C] transition hover:bg-[#fff1f4] disabled:opacity-60"
+                          >
+                            {deletingId === property.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })()
               ))}
             </div>
           ) : null}
         </section>
 
-        <section className="mt-12 rounded-[32px] bg-white p-6 shadow-[0_16px_50px_rgba(34,34,34,0.08)] lg:p-8">
+        <section className="mt-12 rounded-[32px] border border-[#ececec] bg-white/95 p-6 shadow-[0_12px_32px_rgba(34,34,34,0.08)] backdrop-blur lg:p-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.24em] text-[#ff385c]">Recent bookings</p>
@@ -403,7 +565,7 @@ function HostDashboard() {
             alignItems: 'center',
             justifyContent: 'center',
             padding: '16px'
-        }}
+          }}
           onClick={(e) => {
             if (e.currentTarget === e.target) {
               closeDrawer()
@@ -412,15 +574,16 @@ function HostDashboard() {
         >
           <div
             style={{
-                backgroundColor: 'white',
-                borderRadius: '16px',
-                padding: '32px',
-                width: '100%',
-                maxWidth: '512px',
-                maxHeight: '90vh',
-                overflowY: 'auto',
-                position: 'relative',
-                boxShadow: '0 24px 60px rgba(0,0,0,0.22)'
+              backgroundColor: 'white',
+              borderRadius: '28px',
+              border: '1px solid #ececec',
+              padding: '32px',
+              width: '100%',
+              maxWidth: '512px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              position: 'relative',
+              boxShadow: '0 20px 48px rgba(34,34,34,0.16)'
             }}
           >
             <button
@@ -433,8 +596,12 @@ function HostDashboard() {
             </button>
 
             <div className="pr-6 mb-6">
-              <p className="text-sm font-bold uppercase tracking-[0.24em] text-[#ff385c]">Add new listing</p>
-              <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[#222222]">Publish a new stay</h2>
+              <p className="text-sm font-bold uppercase tracking-[0.24em] text-[#ff385c]">
+                {editingProperty ? 'Edit listing' : 'Add new listing'}
+              </p>
+              <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[#222222]">
+                {editingProperty ? 'Update your stay' : 'Publish a new stay'}
+              </h2>
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
@@ -523,15 +690,23 @@ function HostDashboard() {
                   <p className="mt-4 text-sm font-semibold text-[#222222]">
                     Drag and drop your photo here or click to upload
                   </p>
-                  <p className="mt-2 text-xs text-[#6a6a6a]">JPG, PNG, or WEBP up to 5MB</p>
-                  {photoFile ? <p className="mt-3 text-sm font-medium text-[#ff385c]">{photoFile.name}</p> : null}
+                  <p className="mt-2 text-xs text-[#6a6a6a]">JPG, PNG, WEBP, or AVIF up to 5MB</p>
+                  {photoFiles.length > 0 ? (
+                    <div className="mt-3 space-y-1 text-sm font-medium text-[#ff385c]">
+                      <p>{photoFiles.length} file(s) selected</p>
+                      <p className="text-xs text-[#6a6a6a]">
+                        {photoFiles.map((file) => file.name).join(', ')}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/jpeg,image/png,image/webp,image/avif,.avif"
+                  multiple
                   className="hidden"
-                  onChange={(event) => setPhotoFile(event.target.files?.[0] || null)}
+                  onChange={(event) => setPhotoFiles(Array.from(event.target.files || []))}
                 />
               </div>
 
@@ -544,7 +719,7 @@ function HostDashboard() {
                 disabled={submitting}
                 className="w-full rounded-xl bg-[#FF385C] px-4 py-3.5 text-base font-bold text-white transition duration-200 hover:bg-[#e62e53] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {submitting ? 'Publishing...' : 'Publish Listing'}
+                {submitting ? 'Saving...' : editingProperty ? 'Save Changes' : 'Publish Listing'}
               </button>
             </form>
           </div>

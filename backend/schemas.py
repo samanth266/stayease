@@ -52,6 +52,19 @@ class PropertyUpdate(BaseModel):
     is_available: bool | None = None
 
 
+class PropertyPhotoResponse(ORMBaseModel):
+    id: UUID
+    property_id: UUID
+    photo_url: str
+    created_at: datetime
+
+
+class PropertyBookingWindow(ORMBaseModel):
+    checkin_date: date
+    checkout_date: date
+    status: str
+
+
 class PropertyResponse(ORMBaseModel):
     id: UUID
     host_id: UUID
@@ -63,6 +76,8 @@ class PropertyResponse(ORMBaseModel):
     is_available: bool
     created_at: datetime
     average_rating: float | None = None
+    photos: list[PropertyPhotoResponse] = Field(default_factory=list)
+    bookings: list[PropertyBookingWindow] = Field(default_factory=list)
     host: UserResponse | None = None
 
 
@@ -86,6 +101,7 @@ class BookingResponse(ORMBaseModel):
 
 class HostBookingSummary(ORMBaseModel):
     id: UUID
+    property_id: UUID
     guest_name: str
     property_title: str
     property_location: str

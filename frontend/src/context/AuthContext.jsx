@@ -3,6 +3,23 @@ import api from '../services/api'
 
 const AuthContext = createContext()
 
+const normalizeUser = (rawUser) => {
+  if (!rawUser || typeof rawUser !== 'object') {
+    return null
+  }
+
+  // Login/register responses use user_id while /auth/me uses id.
+  const normalizedId = rawUser.id ?? rawUser.user_id ?? null
+  if (!normalizedId) {
+    return rawUser
+  }
+
+  return {
+    ...rawUser,
+    id: normalizedId,
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(null)
@@ -15,14 +32,17 @@ export const AuthProvider = ({ children }) => {
     if (storedToken) {
       setToken(storedToken)
       if (storedUser) {
-        setUser(JSON.parse(storedUser))
+        const normalizedStoredUser = normalizeUser(JSON.parse(storedUser))
+        setUser(normalizedStoredUser)
+        localStorage.setItem('stayease_user', JSON.stringify(normalizedStoredUser))
       }
 
       api
         .get('/api/auth/me')
         .then((response) => {
-          setUser(response.data)
-          localStorage.setItem('stayease_user', JSON.stringify(response.data))
+          const normalizedUser = normalizeUser(response.data)
+          setUser(normalizedUser)
+          localStorage.setItem('stayease_user', JSON.stringify(normalizedUser))
         })
         .catch(() => {
           localStorage.removeItem('stayease_token')
@@ -41,13 +61,14 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/api/auth/login', { email, password })
       const { token: newToken, ...userData } = response.data
+      const normalizedUser = normalizeUser(userData)
 
       localStorage.setItem('stayease_token', newToken)
-      localStorage.setItem('stayease_user', JSON.stringify(userData))
+      localStorage.setItem('stayease_user', JSON.stringify(normalizedUser))
 
       setToken(newToken)
-      setUser(userData)
-      return userData
+      setUser(normalizedUser)
+      return normalizedUser
     } finally {
       setIsLoading(false)
     }
@@ -63,13 +84,14 @@ export const AuthProvider = ({ children }) => {
         role,
       })
       const { token: newToken, ...userData } = response.data
+      const normalizedUser = normalizeUser(userData)
 
       localStorage.setItem('stayease_token', newToken)
-      localStorage.setItem('stayease_user', JSON.stringify(userData))
+      localStorage.setItem('stayease_user', JSON.stringify(normalizedUser))
 
       setToken(newToken)
-      setUser(userData)
-      return userData
+      setUser(normalizedUser)
+      return normalizedUser
     } finally {
       setIsLoading(false)
     }

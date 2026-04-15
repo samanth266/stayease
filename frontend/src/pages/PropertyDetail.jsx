@@ -17,6 +17,7 @@ function PropertyDetail() {
   const [bookingError, setBookingError] = useState('')
   const [bookingSuccess, setBookingSuccess] = useState('')
   const [isBooking, setIsBooking] = useState(false)
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
 
   const totalNights = useMemo(() => {
     if (!checkinDate || !checkoutDate) {
@@ -50,13 +51,17 @@ function PropertyDetail() {
   }, [property?.average_rating, reviews])
 
   const propertyPhotos = useMemo(() => {
-    const candidatePhotos = Array.isArray(property?.photos)
+    const photosFromObjects = Array.isArray(property?.photos)
       ? property.photos
-      : Array.isArray(property?.photo_urls)
-        ? property.photo_urls
-        : []
+        .map((photo) => (typeof photo === 'string' ? photo : photo?.photo_url || photo?.url))
+        .filter(Boolean)
+      : []
+    const photosFromLegacyArray = Array.isArray(property?.photo_urls)
+      ? property.photo_urls.filter(Boolean)
+      : []
+    const candidatePhotos = [...photosFromObjects, ...photosFromLegacyArray]
 
-    const resolvedPhotos = candidatePhotos.filter(Boolean)
+    const resolvedPhotos = [...new Set(candidatePhotos)]
 
     if (resolvedPhotos.length > 0) {
       return resolvedPhotos
@@ -64,6 +69,11 @@ function PropertyDetail() {
 
     return property?.photo_url ? [property.photo_url] : []
   }, [property])
+
+  const selectedPhoto =
+    propertyPhotos[selectedPhotoIndex] ||
+    propertyPhotos[0] ||
+    'https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=1600&auto=format&fit=crop'
 
   const host = property?.host
 
@@ -124,6 +134,31 @@ function PropertyDetail() {
     fetchProperty()
   }, [id])
 
+  useEffect(() => {
+    if (propertyPhotos.length === 0) {
+      setSelectedPhotoIndex(0)
+      return
+    }
+
+    if (selectedPhotoIndex > propertyPhotos.length - 1) {
+      setSelectedPhotoIndex(0)
+    }
+  }, [propertyPhotos, selectedPhotoIndex])
+
+  const showPreviousPhoto = () => {
+    if (propertyPhotos.length <= 1) return
+    setSelectedPhotoIndex((current) =>
+      current === 0 ? propertyPhotos.length - 1 : current - 1
+    )
+  }
+
+  const showNextPhoto = () => {
+    if (propertyPhotos.length <= 1) return
+    setSelectedPhotoIndex((current) =>
+      current === propertyPhotos.length - 1 ? 0 : current + 1
+    )
+  }
+
   const handleBookingSubmit = async (event) => {
     event.preventDefault()
     setBookingError('')
@@ -173,8 +208,8 @@ function PropertyDetail() {
     <div className="min-h-screen bg-[#faf7f5]">
       <Navbar />
 
-      <main className="mx-auto w-full max-w-[1440px] px-6 py-8 lg:px-10 lg:py-10">
-        <Link to="/" className="inline-flex items-center text-sm font-semibold text-[#ff385c] transition hover:text-[#e62e53]">
+      <main className="mx-auto w-full max-w-[1440px] px-6 pb-8 lg:px-10 lg:pb-10" style={{ paddingTop: '72px' }}>
+        <Link to="/" className="inline-flex items-center text-sm font-semibold text-[#ff385c] transition hover:text-[#e62e53] mt-4 block">
           ← Back to listings
         </Link>
 
@@ -185,32 +220,67 @@ function PropertyDetail() {
 
         {!isLoading && property ? (
           <section className="mt-6 space-y-8">
-            <div className="overflow-hidden rounded-[32px] bg-white shadow-[0_16px_50px_rgba(34,34,34,0.08)]">
-              {propertyPhotos.length > 1 ? (
-                <div className="grid max-h-[400px] gap-2 p-2 lg:grid-cols-4">
-                  <img
-                    src={propertyPhotos[0]}
-                    alt={property.title}
-                    className="h-[380px] w-full rounded-[24px] object-cover lg:col-span-2 lg:row-span-2 lg:h-full"
-                  />
-                  <img
-                    src={propertyPhotos[1] || propertyPhotos[0]}
-                    alt={property.title}
-                    className="hidden h-[186px] w-full rounded-[24px] object-cover lg:col-span-2 lg:block"
-                  />
-                  <img
-                    src={propertyPhotos[2] || propertyPhotos[1] || propertyPhotos[0]}
-                    alt={property.title}
-                    className="hidden h-[186px] w-full rounded-[24px] object-cover lg:col-span-2 lg:block"
-                  />
+            <div className="overflow-hidden rounded-[32px] bg-white p-4 shadow-[0_16px_50px_rgba(34,34,34,0.08)] lg:p-5">
+              <div className="relative overflow-hidden rounded-[24px] bg-[#f6f6f6]">
+                <div className="w-full overflow-hidden rounded-[20px]">
+                  <div
+                    className="group relative block h-[280px] w-full overflow-hidden sm:h-[360px] lg:h-[460px]"
+                  >
+                    <img
+                      src={selectedPhoto}
+                      alt={property.title}
+                      className="h-full w-full bg-[#f3f4f6] object-contain"
+                    />
+                  </div>
                 </div>
-              ) : (
-                <img
-                  src={propertyPhotos[0] || 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=1600&auto=format&fit=crop'}
-                  alt={property.title}
-                  className="max-h-[400px] w-full object-cover"
-                />
-              )}
+
+                {propertyPhotos.length > 1 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={showPreviousPhoto}
+                      className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-xl text-[#222222] shadow-md transition hover:bg-white"
+                      aria-label="Previous image"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={showNextPhoto}
+                      className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-xl text-[#222222] shadow-md transition hover:bg-white"
+                      aria-label="Next image"
+                    >
+                      ›
+                    </button>
+                    <div className="absolute bottom-3 right-3 rounded-full bg-[#222222]/75 px-3 py-1 text-xs font-semibold text-white">
+                      {selectedPhotoIndex + 1} / {propertyPhotos.length}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              {propertyPhotos.length > 1 ? (
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {propertyPhotos.map((photo, index) => (
+                    <button
+                      key={`${photo}-${index}`}
+                      type="button"
+                      onClick={() => setSelectedPhotoIndex(index)}
+                      className={`relative h-[120px] w-[120px] flex-none overflow-hidden rounded-xl border-2 transition ${index === selectedPhotoIndex
+                        ? 'border-[#FF385C] shadow-sm'
+                        : 'border-transparent opacity-80 hover:opacity-100'
+                        }`}
+                      aria-label={`View image ${index + 1}`}
+                    >
+                      <img
+                        src={photo}
+                        alt={`${property.title} photo ${index + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-8 lg:grid-cols-[minmax(0,60%)_minmax(340px,40%)] lg:items-start">

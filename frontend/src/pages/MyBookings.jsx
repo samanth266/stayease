@@ -7,6 +7,7 @@ function MyBookings() {
   const [bookings, setBookings] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [navbarOffset, setNavbarOffset] = useState(96)
   const [activeTab, setActiveTab] = useState('Upcoming')
   const [actionError, setActionError] = useState('')
   const [actionSuccess, setActionSuccess] = useState('')
@@ -30,6 +31,21 @@ function MyBookings() {
 
   useEffect(() => {
     fetchBookings()
+  }, [])
+
+  useEffect(() => {
+    const updateNavbarOffset = () => {
+      const navbar = document.getElementById('main-navbar')
+      const height = navbar?.offsetHeight ?? 0
+      setNavbarOffset(height + 16)
+    }
+
+    updateNavbarOffset()
+    window.addEventListener('resize', updateNavbarOffset)
+
+    return () => {
+      window.removeEventListener('resize', updateNavbarOffset)
+    }
   }, [])
 
   const today = useMemo(() => new Date(), [])
@@ -142,13 +158,12 @@ function MyBookings() {
   }
 
   return (
-    <div className="min-h-screen bg-[#faf7f5]">
+    <div className="min-h-screen bg-[#faf7f5]" style={{ paddingTop: `${navbarOffset}px` }}>
       <Navbar />
 
-      <main className="mx-auto w-full max-w-[1280px] px-6 py-8 lg:px-10 lg:py-10">
+      <main className="mx-auto w-full max-w-[1280px] px-6 pb-8 pt-4 lg:px-10 lg:pb-10 lg:pt-6">
         <div className="max-w-3xl">
-          <p className="text-sm font-bold uppercase tracking-[0.28em] text-[#ff385c]">Trips</p>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#222222]">Trips</h1>
+          <h1 className="text-4xl font-extrabold tracking-[-0.04em] text-[#222222]">Trips</h1>
           <p className="mt-3 text-base leading-7 text-[#6a6a6a]">
             Track your upcoming stays, completed trips, and cancellations in one place.
           </p>
@@ -162,7 +177,7 @@ function MyBookings() {
               onClick={() => setActiveTab(tab)}
               className={`rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200 ${
                 activeTab === tab
-                  ? 'bg-[#222222] text-white shadow-sm'
+                  ? 'bg-[#FF385C] text-white shadow-sm'
                   : 'bg-white text-[#444444] shadow-sm ring-1 ring-[#ececec] hover:text-[#ff385c]'
               }`}
             >
@@ -275,8 +290,36 @@ function MyBookings() {
       </main>
 
       {reviewModalBooking ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#222222]/55 px-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-[0_24px_60px_rgba(0,0,0,0.22)]">
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(34,34,34,0.55)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={(event) => {
+            if (event.currentTarget === event.target) {
+              closeReviewModal()
+            }
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              backgroundColor: 'white',
+              borderRadius: '28px',
+              padding: '24px',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
+            }}
+          >
             <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#222222]">Review your stay</h2>
             <p className="mt-1 text-sm text-[#6a6a6a]">
               {reviewModalBooking.property?.title || 'Property'}
