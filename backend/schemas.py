@@ -76,6 +76,7 @@ class PropertyResponse(ORMBaseModel):
     is_available: bool
     created_at: datetime
     average_rating: float | None = None
+    review_count: int = 0
     photos: list[PropertyPhotoResponse] = Field(default_factory=list)
     bookings: list[PropertyBookingWindow] = Field(default_factory=list)
     host: UserResponse | None = None

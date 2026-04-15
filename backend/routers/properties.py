@@ -8,13 +8,14 @@ from azure.core.exceptions import AzureError
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobSasPermissions, BlobServiceClient, ContentSettings, generate_blob_sas
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm import Session
 
 from auth import require_host
 from database import get_db
 from keyvault import settings
-from models import Property, PropertyPhoto, User
+from models import Property, PropertyPhoto, Review, User
 from schemas import PropertyCreate, PropertyResponse, PropertyUpdate
 
 router = APIRouter(prefix="/properties", tags=["properties"])
@@ -173,6 +174,40 @@ def _upload_property_photo(property_id: UUID, file: UploadFile) -> str:
     return blob_name
 
 
+def _attach_review_metrics(properties: list[Property], db: Session) -> None:
+    if not properties:
+        return
+
+    property_ids = [property_record.id for property_record in properties]
+    rating_rows = (
+        db.query(
+            Review.property_id,
+            func.avg(Review.rating).label("average_rating"),
+            func.count(Review.id).label("review_count"),
+        )
+        .filter(Review.property_id.in_(property_ids))
+        .group_by(Review.property_id)
+        .all()
+    )
+
+    rating_map = {
+        row.property_id: {
+            "average_rating": float(row.average_rating) if row.average_rating is not None else None,
+            "review_count": int(row.review_count),
+        }
+        for row in rating_rows
+    }
+
+    for property_record in properties:
+        metrics = rating_map.get(property_record.id)
+        if metrics:
+            property_record.average_rating = metrics["average_rating"]
+            property_record.review_count = metrics["review_count"]
+        else:
+            property_record.average_rating = None
+            property_record.review_count = 0
+
+
 @router.get("", response_model=List[PropertyResponse])
 def list_properties(
     location: str | None = Query(None),
@@ -194,6 +229,7 @@ def list_properties(
         query = query.filter(Property.price_per_night <= max_price)
 
     properties = query.all()
+    _attach_review_metrics(properties, db)
     _sign_property_photo_urls(properties)
     return properties
 
@@ -234,6 +270,7 @@ def get_property(property_id: UUID, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Property not found.",
         )
+    _attach_review_metrics([property_record], db)
     _sign_property_photo_urls([property_record])
     return property_record
 

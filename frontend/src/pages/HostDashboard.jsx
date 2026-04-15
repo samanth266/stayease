@@ -498,7 +498,6 @@ function HostDashboard() {
         <section className="mt-12 rounded-[32px] border border-[#ececec] bg-white/95 p-6 shadow-[0_12px_32px_rgba(34,34,34,0.08)] backdrop-blur lg:p-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.24em] text-[#ff385c]">Recent bookings</p>
               <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] text-[#222222]">Recent bookings</h2>
             </div>
             <p className="text-sm text-[#6a6a6a]">Latest guest activity across your listings</p>

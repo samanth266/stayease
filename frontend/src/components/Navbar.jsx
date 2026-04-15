@@ -47,7 +47,7 @@ function Navbar() {
 
   return (
     <>
-      <header id="main-navbar" className="fixed top-0 z-50 w-full border-b border-[#ececec] bg-white shadow-[0_4px_18px_rgba(34,34,34,0.06)] overflow-visible">
+      <header id="main-navbar" className="fixed top-0 z-50 w-full border-b border-[#ececec] bg-white/100 shadow-[0_4px_18px_rgba(34,34,34,0.08)] overflow-visible backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between gap-6 px-6 py-3 lg:px-10 overflow-visible">
           <Link to="/" className="group inline-flex items-center gap-2 transition-transform duration-200 hover:scale-[1.02]">
             <img src={stayeaseMark} alt="StayEase logo" className="h-9 w-9" />

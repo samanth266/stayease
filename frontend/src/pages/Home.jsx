@@ -253,9 +253,9 @@ function Home() {
             ) : null}
 
             {!isLoading && filteredProperties.length > 0 ? (
-              <section className="mt-8 flex flex-wrap items-start gap-4">
+              <section className="mt-8 grid gap-4 auto-rows-max grid-cols-[repeat(auto-fill,minmax(292px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(348px,1fr))]">
                 {filteredProperties.map((property) => (
-                  <div key={property.id} className="w-[292px] sm:w-[320px] lg:w-[348px]">
+                  <div key={property.id} className="h-full">
                     <PropertyCard property={property} hoverScale={false} />
                   </div>
                 ))}

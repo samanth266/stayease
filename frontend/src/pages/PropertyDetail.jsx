@@ -76,6 +76,7 @@ function PropertyDetail() {
     'https://images.unsplash.com/photo-1568605114967-8130f3a36994?q=80&w=1600&auto=format&fit=crop'
 
   const host = property?.host
+  const isHostUser = user?.role === 'host'
 
   const formatDisplayDate = (value) => {
     if (!value) return 'Recently'
@@ -400,70 +401,76 @@ function PropertyDetail() {
                     </div>
                   </div>
 
-                  <form onSubmit={handleBookingSubmit} className="mt-6 space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-[#6a6a6a]">
-                          Check in
-                        </span>
-                        <input
-                          type="date"
-                          value={checkinDate}
-                          onChange={(event) => setCheckinDate(event.target.value)}
-                          className="w-full rounded-xl border border-[#d8d8d8] bg-white px-4 py-3 text-[#222222] outline-none transition focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
-                        />
-                      </label>
-
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-[#6a6a6a]">
-                          Check out
-                        </span>
-                        <input
-                          type="date"
-                          value={checkoutDate}
-                          onChange={(event) => setCheckoutDate(event.target.value)}
-                          className="w-full rounded-xl border border-[#d8d8d8] bg-white px-4 py-3 text-[#222222] outline-none transition focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
-                        />
-                      </label>
+                  {isHostUser ? (
+                    <div className="mt-6 rounded-2xl border border-[#ececec] bg-[#faf7f5] px-4 py-6 text-sm text-[#5e5e5e]">
+                      Hosts cannot reserve stays. Switch to a guest account to book this property.
                     </div>
+                  ) : (
+                    <form onSubmit={handleBookingSubmit} className="mt-6 space-y-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-[#6a6a6a]">
+                            Check in
+                          </span>
+                          <input
+                            type="date"
+                            value={checkinDate}
+                            onChange={(event) => setCheckinDate(event.target.value)}
+                            className="w-full rounded-xl border border-[#d8d8d8] bg-white px-4 py-3 text-[#222222] outline-none transition focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
+                          />
+                        </label>
 
-                    <div className="space-y-3 rounded-2xl bg-[#faf7f5] p-4">
-                      <div className="flex items-center justify-between text-sm text-[#6a6a6a]">
-                        <span>Price</span>
-                        <span>${Number(property.price_per_night).toFixed(0)} x {totalNights || 0} nights</span>
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-[#6a6a6a]">
+                            Check out
+                          </span>
+                          <input
+                            type="date"
+                            value={checkoutDate}
+                            onChange={(event) => setCheckoutDate(event.target.value)}
+                            className="w-full rounded-xl border border-[#d8d8d8] bg-white px-4 py-3 text-[#222222] outline-none transition focus:border-[#FF385C] focus:ring-4 focus:ring-[#ff385c]/15"
+                          />
+                        </label>
                       </div>
-                      <div className="flex items-center justify-between text-sm text-[#6a6a6a]">
-                        <span>Nights</span>
-                        <span>{totalNights || 0}</span>
+
+                      <div className="space-y-3 rounded-2xl bg-[#faf7f5] p-4">
+                        <div className="flex items-center justify-between text-sm text-[#6a6a6a]">
+                          <span>Price</span>
+                          <span>${Number(property.price_per_night).toFixed(0)} x {totalNights || 0} nights</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm text-[#6a6a6a]">
+                          <span>Nights</span>
+                          <span>{totalNights || 0}</span>
+                        </div>
+                        <div className="h-px bg-[#e7e7e7]" />
+                        <div className="flex items-center justify-between text-base font-semibold text-[#222222]">
+                          <span>Total</span>
+                          <span>${totalPrice.toFixed(2)}</span>
+                        </div>
                       </div>
-                      <div className="h-px bg-[#e7e7e7]" />
-                      <div className="flex items-center justify-between text-base font-semibold text-[#222222]">
-                        <span>Total</span>
-                        <span>${totalPrice.toFixed(2)}</span>
-                      </div>
-                    </div>
 
-                    {bookingError ? (
-                      <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                        {bookingError}
-                      </p>
-                    ) : null}
-                    {bookingSuccess ? (
-                      <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                        {bookingSuccess}
-                      </p>
-                    ) : null}
+                      {bookingError ? (
+                        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                          {bookingError}
+                        </p>
+                      ) : null}
+                      {bookingSuccess ? (
+                        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                          {bookingSuccess}
+                        </p>
+                      ) : null}
 
-                    <button
-                      type="submit"
-                      disabled={isBooking}
-                      className="w-full rounded-xl bg-[#FF385C] px-4 py-3.5 text-base font-bold text-white transition duration-200 hover:bg-[#e62e53] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isBooking ? 'Reserving...' : 'Reserve'}
-                    </button>
+                      <button
+                        type="submit"
+                        disabled={isBooking}
+                        className="w-full rounded-xl bg-[#FF385C] px-4 py-3.5 text-base font-bold text-white transition duration-200 hover:bg-[#e62e53] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isBooking ? 'Reserving...' : 'Reserve'}
+                      </button>
 
-                    <p className="text-center text-sm text-[#6a6a6a]">You won&apos;t be charged yet</p>
-                  </form>
+                      <p className="text-center text-sm text-[#6a6a6a]">You won&apos;t be charged yet</p>
+                    </form>
+                  )}
                 </div>
               </aside>
             </div>
