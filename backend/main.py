@@ -28,7 +28,11 @@ def create_tables_on_startup() -> None:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+    "http://localhost:5173",
+    "https://gentle-pebble-03f1c280f.1.azurestaticapps.net",
+    "https://stayease.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
